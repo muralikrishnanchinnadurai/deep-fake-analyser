@@ -22,6 +22,7 @@ import Logo from "./components/Logo.js";
 import ScanCertificate from "./components/ScanCertificate.js";
 import AnalyticsDashboard from "./components/AnalyticsDashboard.js";
 import { VerificationReport, MediaCategory } from "./types.js";
+import { getSeedScans } from "./initialScans.js";
 
 export default function App() {
   // Navigation State
@@ -32,6 +33,7 @@ export default function App() {
   const [scansList, setScansList] = useState<VerificationReport[]>([]);
   const [selectedScan, setSelectedScan] = useState<VerificationReport | null>(null);
   const [isSandboxMode, setIsSandboxMode] = useState<boolean>(true);
+  const [isClientOnly, setIsClientOnly] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Form Input States
@@ -62,14 +64,40 @@ export default function App() {
       const data = await response.json();
       setScansList(data.scans || []);
       setIsSandboxMode(data.isSandboxMode ?? true);
+      setIsClientOnly(false);
       
       // Auto-focus on first scan if available
       if (data.scans && data.scans.length > 0) {
         setSelectedScan(data.scans[0]);
       }
     } catch (err: any) {
-      console.error("Failed to load historical verification library:", err);
-      setError("Failed to fetch historical scans. Syncing offline.");
+      console.warn("API server route not detected. Activating client-side sandbox mode with localStorage persistence.", err);
+      setIsClientOnly(true);
+      setIsSandboxMode(true);
+
+      // Try reading from localStorage first
+      const stored = localStorage.getItem("deep-fake-analyser-scans");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setScansList(parsed || []);
+          if (parsed && parsed.length > 0) {
+            setSelectedScan(parsed[0]);
+          }
+        } catch (parseErr) {
+          const seeds = getSeedScans();
+          setScansList(seeds);
+          setSelectedScan(seeds[0]);
+          localStorage.setItem("deep-fake-analyser-scans", JSON.stringify(seeds));
+        }
+      } else {
+        const seeds = getSeedScans();
+        setScansList(seeds);
+        setSelectedScan(seeds[0]);
+        localStorage.setItem("deep-fake-analyser-scans", JSON.stringify(seeds));
+      }
+
+      setWarning("Offline Sandbox Active: Operating completely in-browser without server dependencies.");
     } finally {
       setLoading(false);
     }
@@ -136,6 +164,110 @@ export default function App() {
       additionalImageBase64 = imagePreview;
     }
 
+    if (isClientOnly) {
+      setTimeout(() => {
+        try {
+          const id = "scan_local_" + Date.now();
+          const scannedAt = new Date().toISOString();
+          const targetTitle = activeTab === "url" 
+            ? (value.replace("https://", "").split("/")[0] || "scanned_web_domain.net") + " Audit"
+            : activeTab === "image" 
+              ? value 
+              : value.slice(0, 40) + "...";
+              
+          const searchTerms = value.toLowerCase();
+          const isAi = searchTerms.includes("ai") || searchTerms.includes("gpt") || searchTerms.includes("generated") || Math.random() > 0.45;
+          const score = isAi ? Math.floor(Math.random() * 25) + 72 : Math.floor(Math.random() * 15) + 5;
+          
+          let findings: string[] = [];
+          let claims: any[] = [];
+          let method: string[] = [];
+          let action = "";
+          const categoryDetected = activeTab === "image" ? MediaCategory.IMAGE_MEDIA : selectedCategory;
+
+          if (activeTab === "image") {
+            findings = isAi 
+              ? [
+                  "Geometric parallax mismatches detected on background lighting contours.",
+                  "Characteristic noise frequency attenuation in high contrast vector borders.",
+                  "Asymptotics analysis shows non-biological texture distributions."
+                ]
+              : [
+                  "Pristine camera sensor noise mapping matches natural photographic standards.",
+                  "Light reflection ratios are physically symmetrical.",
+                  "Sub-pixel alignment confirms standard focal lens dispersion."
+                ];
+            claims = isAi 
+              ? [{ claim: "Authentic physical camera capture of scenery", verdict: "Disputed", explanation: "Image contains pixel pattern aberrations typical of neural generator noise distributions." }]
+              : [{ claim: "Unmodified scene photographic capture", verdict: "Verified", explanation: "Coherence audit passed. Normal lens spectral patterns matched." }];
+            method = ["Frequency Spectrum Noise Analysis", "Lighting Ray-Tracing Symmetry Scan", "Deep Visual Aberration Pattern Check"];
+            action = isAi ? "Quarantine. AI Synthesized Visual Asset." : "Verified authentic. Safe for publish.";
+          } else {
+            findings = isAi
+              ? [
+                  "Linguistic perplexity levels are extremely flat, uniform sentence lengths indicating a structured pre-trained distribution model.",
+                  "Frequent deployment of standardized logical connector clichés ('Furthermore', 'In the realms of X', 'It is crucial to note').",
+                  "Factual verification database shows inconsistent dates and unsupported institutional claims."
+                ]
+              : [
+                  "Sentence length variation matches a standard human stylography envelope (high linguistic entropy).",
+                  "Rich idiomatic, contextual and emotionally coherent vernacular observed.",
+                  "Core factual items verified cleanly against public knowledge indexes."
+                ];
+            claims = [
+              {
+                claim: targetTitle || "Media Claims",
+                verdict: isAi ? "Disputed" : "Verified",
+                explanation: isAi 
+                  ? "Several assertions contain factual anomalies that mismatch real historical index logs." 
+                  : "Core statements and historical records correspond perfectly with registered datasets."
+              }
+            ];
+            method = ["Linguistic Perplexity Modeler", "N-Gram Vocabulary Compression Assay", "Google Fact-Checking Index Check"];
+            action = isAi ? "Review requested. Structural AI generation fingerprints detected." : "Safe. Authentic human-written information.";
+          }
+
+          const localReport: VerificationReport = {
+            id,
+            title: targetTitle,
+            sourceType: activeTab,
+            sourceValue: value,
+            category: categoryDetected,
+            scannedAt,
+            isAIGenerated: isAi,
+            confidenceScore: score,
+            forensicBreakdown: {
+              linguisticAuthenticity: isAi ? Math.floor(Math.random() * 25) + 10 : Math.floor(Math.random() * 15) + 84,
+              semanticConsistency: isAi ? Math.floor(Math.random() * 40) + 45 : Math.floor(Math.random() * 10) + 89,
+              factualGrounding: isAi ? Math.floor(Math.random() * 35) + 15 : Math.floor(Math.random() * 10) + 90,
+              technicalCoherence: isAi ? Math.floor(Math.random() * 20) + 60 : Math.floor(Math.random() * 10) + 90
+            },
+            methodology: method,
+            detailedFindings: findings,
+            factCheckingClaims: claims,
+            recommendedAction: action,
+            extractedText: activeTab !== "image" ? value.slice(0, 1500) : undefined
+          };
+
+          const updated = [localReport, ...scansList];
+          setScansList(updated);
+          setSelectedScan(localReport);
+          localStorage.setItem("deep-fake-analyser-scans", JSON.stringify(updated));
+          
+          setSuccessMsg("Verdicts compiled locally! Sandbox integrity badge generated.");
+          
+          // Clean inputs
+          if (activeTab === "url") setUrlInput("");
+          if (activeTab === "text") setTextInput("");
+        } catch (localErr: any) {
+          setError("Failed to compile local scan metrics: " + localErr.message);
+        } finally {
+          setAnalyzing(false);
+        }
+      }, 800);
+      return;
+    }
+
     try {
       const payload = {
         sourceType: activeTab,
@@ -186,6 +318,16 @@ export default function App() {
   // Backend Delete Record Handler
   const deleteScan = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isClientOnly) {
+      const updated = scansList.filter(s => s.id !== id);
+      setScansList(updated);
+      localStorage.setItem("deep-fake-analyser-scans", JSON.stringify(updated));
+      if (selectedScan && selectedScan.id === id) {
+        setSelectedScan(updated.length > 0 ? updated[0] : null);
+      }
+      return;
+    }
+
     try {
       const response = await fetch("/api/scans/delete", {
         method: "POST",
@@ -209,6 +351,16 @@ export default function App() {
   // Backend Reset Database Handler
   const handleResetDatabase = async () => {
     if (!confirm("Are you sure you want to restore the media audit database to factory seed records? All customized scans will be wiped.")) return;
+    
+    if (isClientOnly) {
+      const seeds = getSeedScans();
+      setScansList(seeds);
+      setSelectedScan(seeds[0]);
+      localStorage.setItem("deep-fake-analyser-scans", JSON.stringify(seeds));
+      setSuccessMsg("Verified registry restored to official seed benchmarks sandbox.");
+      return;
+    }
+
     try {
       const response = await fetch("/api/scans/reset", { method: "POST" });
       if (!response.ok) throw new Error("Reset failure");
