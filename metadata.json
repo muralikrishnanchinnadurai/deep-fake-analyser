@@ -1,0 +1,6 @@
+{
+  "name": "The Media Monitoring",
+  "description": "AI-powered web forensic and media content verification system designed for identifying synthetically generated URLs, articles, and images with detailed forensic scores, category analytics, and automated daily/weekly/monthly PDF scan reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
